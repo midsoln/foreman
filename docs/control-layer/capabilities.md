@@ -103,12 +103,13 @@ Checked on 2026-10-03 with Claude Code 2.1.288 and Codex CLI 0.160.0.
   characters of Claude text (roughly 500 and 1,000 tokens) against 52,716 and 86,500
   output tokens. Most output is tool input and thinking.
 - **The silent-work section cuts it.** `scripts/probe-agents.sh` runs a three-file read
-  task five times with and without the section, and counts a run only if it read each
-  file with its own tool call and answered 6. All 20 runs did. Codex wrote 184
-  characters of progress text without it and none with it, and its output tokens fell
-  from 1,390 to 1,059. Claude (haiku) wrote none either way on that task, and its output
-  tokens fell from 3,622 to 3,385. Codex's built-in instructions ask for a preamble before tool calls;
-  the section has to say it overrides them, or Codex still writes one.
+  task five times with and without the section, and counts a run only if each file
+  came back from its own successful tool call and the answer was 6. All 20 runs did.
+  Codex wrote 52 characters of progress text without it and none with it, and its
+  output tokens fell from 1,333 to 1,040. Claude (haiku) wrote none either way on that
+  task, so its output tokens (3,410 and 3,721) only show run-to-run noise. Codex's
+  built-in instructions ask for a preamble before tool calls; the section has to say it
+  overrides them, or Codex still writes one.
 
 ## gh
 

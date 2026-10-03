@@ -86,16 +86,21 @@ check "codex reviewer (read-only) cannot write" "$(test -f reviewer-wrote-codex.
 # Progress text between tool calls is billed output. Run the same multi-step task with
 # and without foreman's silent-work section, five times each since one run is noisy,
 # and compare the summed progress text (every message but the last) and output tokens.
-# A run counts only if it read each file in its own tool call and answered 6, so a run
-# that skipped the work can't make either side look quieter.
+# A run counts only if it read each file in its own successful tool call and answered
+# 6, so a run that skipped the work can't make either side look quieter.
 silent="$(sed -n '/## Working silently/,/^`)/p' "$root/internal/agent/prompt.go" | sed -e '$d' -e 's/^.*WriteString(`//')"
 for f in a b c; do printf 'apple\nbanana\napricot\n' >"$f.txt"; done
 task='Read a.txt, b.txt and c.txt one at a time, each with its own tool call. Count the lines that start with "a" across all three files. End with only the count.'
-claude_done='([.[] | select(.type=="assistant") | .message.content[] | select(.type=="tool_use" and .name=="Read")
-  | .input.file_path // "" | capture("(?<f>[abc])\\.txt$").f] | unique | length == 3)
-  and ([.[] | select(.type=="result") | .result // "" | test("^\\s*6\\.?\\s*$")] | any)'
+# A read counts only when its result holds the file's text, so a denied or failed call
+# does not.
+claude_done='. as $ev | [$ev[] | select(.type=="user") | .message.content[]? | select(.type=="tool_result"
+  and (.is_error | not) and (.content | tostring | contains("apricot"))) | .tool_use_id] as $read
+  | ([$ev[] | select(.type=="assistant") | .message.content[] | select(.type=="tool_use" and .name=="Read")
+  | select(.id as $id | $read | index($id)) | .input.file_path // "" | capture("(?<f>[abc])\\.txt$").f] | unique | length == 3)
+  and ([$ev[] | select(.type=="result") | .result // "" | test("^\\s*6\\.?\\s*$")] | any)'
 # Each file has to appear alone in some command, so one cat of all three does not count.
-codex_done='([.[] | select(.type=="item.completed" and .item.type=="command_execution")
+codex_done='([.[] | select(.type=="item.completed" and .item.type=="command_execution"
+  and .item.exit_code == 0 and (.item.aggregated_output // "" | contains("apricot")))
   | [.item.command | scan("[abc]\\.txt")] | unique | select(length == 1) | .[0]] | unique | length == 3)
   and ([.[] | select(.type=="item.completed" and .item.type=="agent_message") | .item.text] | last // "" | test("^\\s*6\\.?\\s*$"))'
 narration() { # agent mode -> "progress_chars output_tokens skipped_runs" over five runs
